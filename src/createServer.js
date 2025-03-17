@@ -8,17 +8,10 @@ function createServer() {
   let users = [];
   let expenses = [];
 
-  const getUserNewId = () => {
-    return users.length + 1;
-  };
+  const getUserNewId = () => users.length + 1;
+  const getExpenseNewId = () => expenses.length + 1;
 
-  const getExpenseNewId = () => {
-    return expenses.length + 1;
-  };
-
-  app.get('/users', (req, res) => {
-    res.send(users);
-  });
+  app.get('/users', (req, res) => res.send(users));
 
   app.get('/users/:id', (req, res) => {
     const { id } = req.params;
@@ -27,7 +20,6 @@ function createServer() {
     if (!currentUser) {
       return res.sendStatus(404);
     }
-
     res.send(currentUser);
   });
 
@@ -38,46 +30,32 @@ function createServer() {
       return res.sendStatus(400);
     }
 
-    const user = {
-      id: getUserNewId(),
-      name,
-    };
+    const user = { id: getUserNewId(), name };
 
     users.push(user);
-
     res.status(201).send(user);
   });
 
   app.delete('/users/:id', (req, res) => {
     const { id } = req.params;
-
     const newUsers = users.filter((user) => user.id !== parseInt(id));
 
     if (users.length === newUsers.length) {
       return res.sendStatus(404);
     }
-
     users = newUsers;
-
     res.sendStatus(204);
   });
 
   app.patch('/users/:id', express.json(), (req, res) => {
     const { id } = req.params;
     const { name } = req.body;
-
     const chosenUser = users.find((user) => user.id === parseInt(id));
 
-    if (typeof name !== 'string') {
+    if (!chosenUser || typeof name !== 'string') {
       return res.sendStatus(400);
     }
-
-    if (!chosenUser || !name) {
-      return res.sendStatus(404);
-    }
-
-    Object.assign(chosenUser, { name });
-
+    chosenUser.name = name;
     res.send(chosenUser);
   });
 
@@ -85,53 +63,45 @@ function createServer() {
     const { userId, from, to, categories } = req.query;
 
     if (!userId && !categories && (!from || !to)) {
-      res.send(expenses);
+      return res.send(expenses);
     }
 
     const normalizedCategories =
-      Array.isArray(categories) || !categories ? categories : [categories];
+      typeof categories === 'string'
+        ? categories.trim()
+          ? [categories]
+          : []
+        : Array.isArray(categories)
+          ? categories
+          : [];
 
-    let filteredExpenses = [...expenses];
+    const filteredExpenses = expenses.filter((expense) => {
+      const matchesUserId = userId ? expense.userId === parseInt(userId) : true;
+      const matchesCategory =
+        normalizedCategories.length > 0
+          ? normalizedCategories.includes(expense.category)
+          : true;
+      const matchesDateRange =
+        from && to
+          ? new Date(expense.spentAt) >= new Date(from) &&
+            new Date(expense.spentAt) <= new Date(to)
+          : true;
 
-    if (userId) {
-      filteredExpenses = filteredExpenses.filter((expense) => {
-        return expense.userId === parseInt(userId);
-      });
-    }
-
-    if (normalizedCategories) {
-      filteredExpenses = expenses.filter((expense) => {
-        return normalizedCategories.includes(expense.category);
-      });
-    }
-
-    if (from && to) {
-      const fromDate = new Date(from);
-      const toDate = new Date(to);
-
-      filteredExpenses = expenses.filter((expense) => {
-        const spentAt = new Date(expense.spentAt);
-
-        return spentAt >= fromDate && spentAt <= toDate;
-      });
-    }
+      return matchesUserId && matchesCategory && matchesDateRange;
+    });
 
     res.send(filteredExpenses);
   });
 
   app.get('/expenses/:id', (req, res) => {
     const { id } = req.params;
-
     const chosenExpense = expenses.find(
       (expense) => expense.id === parseInt(id),
     );
 
     if (!chosenExpense) {
-      res.sendStatus(404);
-
-      return;
+      return res.sendStatus(404);
     }
-
     res.send(chosenExpense);
   });
 
@@ -142,9 +112,7 @@ function createServer() {
       return res.sendStatus(400);
     }
 
-    const findUser = users.find((user) => user.id === parseInt(userId));
-
-    if (!findUser) {
+    if (!users.some((user) => user.id === parseInt(userId))) {
       return res.sendStatus(400);
     }
 
@@ -159,13 +127,11 @@ function createServer() {
     };
 
     expenses.push(newExpense);
-
     res.status(201).send(newExpense);
   });
 
   app.delete('/expenses/:id', (req, res) => {
     const { id } = req.params;
-
     const newExpenses = expenses.filter(
       (expense) => expense.id !== parseInt(id),
     );
@@ -173,15 +139,12 @@ function createServer() {
     if (expenses.length === newExpenses.length) {
       return res.sendStatus(404);
     }
-
     expenses = newExpenses;
-
     res.sendStatus(204);
   });
 
   app.patch('/expenses/:id', express.json(), (req, res) => {
     const { id } = req.params;
-
     const chosenExpense = expenses.find(
       (expense) => expense.id === parseInt(id),
     );
@@ -189,15 +152,11 @@ function createServer() {
     if (!chosenExpense) {
       return res.sendStatus(404);
     }
-
     Object.assign(chosenExpense, req.body);
-
     res.status(200).send(chosenExpense);
   });
 
   return app;
 }
 
-module.exports = {
-  createServer,
-};
+module.exports = { createServer };
