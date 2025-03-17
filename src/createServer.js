@@ -89,13 +89,7 @@ function createServer() {
     }
 
     const normalizedCategories =
-      categories && typeof categories === 'string'
-        ? categories.trim() === ''
-          ? []
-          : [categories]
-        : Array.isArray(categories)
-          ? categories
-          : [];
+      Array.isArray(categories) || !categories ? categories : [categories];
 
     let filteredExpenses = [...expenses];
 
